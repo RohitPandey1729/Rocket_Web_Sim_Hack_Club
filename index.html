@@ -169,5 +169,89 @@ resizeCanvas();
     // Initial draw
     drawEnvironment();
   </script>
+  <!-- Improved, high-contrast control panel -->
+<style>
+  .control-panel {
+    position: fixed;
+    right: 18px;
+    bottom: 24px;
+    width: 320px;
+    background: rgba(8,10,14,0.92);
+    color: #ffffff;
+    padding: 14px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 100000;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    backdrop-filter: blur(6px) saturate(120%);
+  }
+  .control-panel h2 { margin: 0 0 10px 0; font-size: 15px; font-weight: 600; color: #fff; }
+  .control-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .control-label { flex: 1; color: #d1d4da; margin-right:12px; font-size:13px }
+  .control-value { width: 66px; text-align:right; font-weight:700; color:#fff }
+  input[type=range] { -webkit-appearance:none; width:100%; height:12px; background:transparent; margin-bottom:8px }
+  input[type=range]::-webkit-slider-runnable-track { height:8px; background:linear-gradient(90deg,#3a3a3a,#5a5a5a); border-radius:6px }
+  input[type=range]::-moz-range-track { height:8px; background:#4a4a4a; border-radius:6px }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:#ffcc00; border:3px solid rgba(255,255,255,0.12); margin-top:-5px; box-shadow:0 2px 6px rgba(0,0,0,0.5) }
+  input[type=range]::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:#ffcc00; border:3px solid rgba(255,255,255,0.12) }
+  input[type=range]:focus { outline: none; }
+  @media (max-width:520px) {
+    .control-panel { left:12px; right:12px; width:auto; bottom:12px; }
+    .control-value { width:56px }
+  }
+</style>
+
+<div class="control-panel" aria-label="Rocket controls">
+  <h2>Rocket Controls</h2>
+
+  <div class="control-row">
+    <div class="control-label">Thrust</div>
+    <div class="control-value" id="thrust-val">1.0</div>
+  </div>
+  <input id="thrust" type="range" min="0" max="10" step="0.1" value="1.0" aria-valuemin="0" aria-valuemax="10" aria-valuenow="1.0">
+
+  <div class="control-row">
+    <div class="control-label">Fuel</div>
+    <div class="control-value" id="fuel-val">100</div>
+  </div>
+  <input id="fuel" type="range" min="0" max="500" step="1" value="100" aria-valuemin="0" aria-valuemax="500" aria-valuenow="100">
+
+  <div class="control-row">
+    <div class="control-label">Mass</div>
+    <div class="control-value" id="mass-val">1000</div>
+  </div>
+  <input id="mass" type="range" min="100" max="2000" step="10" value="1000" aria-valuemin="100" aria-valuemax="2000" aria-valuenow="1000">
+</div>
+
+<script>
+  window.rocketConfig = window.rocketConfig || { thrust: 1.0, fuel: 100, mass: 1000 };
+
+  function updateConfig(key, value) {
+    window.rocketConfig[key] = value;
+    const el = document.getElementById(key + '-val');
+    if (el) el.textContent = (key === 'thrust') ? parseFloat(value).toFixed(1) : String(value);
+    const slider = document.getElementById(key);
+    if (slider) slider.setAttribute('aria-valuenow', String(value));
+    window.dispatchEvent(new CustomEvent('rocketConfigChanged', { detail: { key, value } }));
+  }
+
+  [['thrust','float'], ['fuel','int'], ['mass','int']].forEach(([id, type])=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    const parse = type === 'float' ? v => parseFloat(v) : v => parseInt(v,10);
+    const onInput = () => updateConfig(id, parse(el.value));
+    el.addEventListener('input', onInput);
+    el.addEventListener('change', onInput);
+    el.addEventListener('keydown', (e)=>{
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { el.value = Number(el.value) - Number(el.step); onInput(); e.preventDefault(); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { el.value = Number(el.value) + Number(el.step); onInput(); e.preventDefault(); }
+    });
+    onInput();
+  });
+</script>
+  </style>
+
+
 </body>
 </html>
