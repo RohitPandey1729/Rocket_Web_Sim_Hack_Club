@@ -42,7 +42,7 @@
       z-index: 0;
     }
 
-    #launchCanvas {
+    #launchCanvas { 
       position: absolute;
       inset: 0;
       width: 100vw;
@@ -152,6 +152,86 @@
       ctx.beginPath();
       ctx.ellipse(400, 60, 50, 18, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      // Rocket on pad
+      function drawRocketOnPad(cx, padTop, scale = 1) {
+        const baseY = padTop;
+        const height = 160 * scale;
+        const halfW = 22 * scale;
+        const bodyTop = baseY - height;
+
+        // body
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW, baseY);
+        ctx.lineTo(cx - halfW, bodyTop + 40 * scale);
+        ctx.quadraticCurveTo(cx - halfW, bodyTop, cx, bodyTop - 24 * scale);
+        ctx.quadraticCurveTo(cx + halfW, bodyTop, cx + halfW, bodyTop + 40 * scale);
+        ctx.lineTo(cx + halfW, baseY);
+        ctx.closePath();
+        const g = ctx.createLinearGradient(cx - halfW, bodyTop, cx + halfW, baseY);
+        g.addColorStop(0, '#f2f4f7');
+        g.addColorStop(0.5, '#ffffff');
+        g.addColorStop(1, '#d6d8dc');
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // nose cone (red)
+        ctx.beginPath();
+        ctx.moveTo(cx, bodyTop - 24 * scale);
+        ctx.lineTo(cx - halfW * 0.7, bodyTop + 10 * scale);
+        ctx.lineTo(cx + halfW * 0.7, bodyTop + 10 * scale);
+        ctx.closePath();
+        ctx.fillStyle = '#ff6b4a';
+        ctx.fill();
+        ctx.stroke();
+
+        // window / cockpit
+        ctx.beginPath();
+        ctx.arc(cx, bodyTop + 52 * scale, 10 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#0e4160';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // left fin (red)
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW, baseY - 20 * scale);
+        ctx.lineTo(cx - halfW - 18 * scale, baseY + 6 * scale);
+        ctx.lineTo(cx - halfW / 3, baseY - 6 * scale);
+        ctx.closePath();
+        ctx.fillStyle = '#b33f3f';
+        ctx.fill();
+
+        // right fin (red)
+        ctx.beginPath();
+        ctx.moveTo(cx + halfW, baseY - 20 * scale);
+        ctx.lineTo(cx + halfW + 18 * scale, baseY + 6 * scale);
+        ctx.lineTo(cx + halfW / 3, baseY - 6 * scale);
+        ctx.closePath();
+        ctx.fillStyle = '#b33f3f';
+        ctx.fill();
+
+        // panel line detail
+        ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW + 6 * scale, bodyTop + 60 * scale);
+        ctx.lineTo(cx + halfW - 6 * scale, bodyTop + 60 * scale);
+        ctx.stroke();
+
+        // shadow under rocket
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(cx, baseY + 10 * scale, halfW * 1.1, 8 * scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw rocket on the pad
+      drawRocketOnPad(padCenterX, padTop, 1);
     }
     function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
@@ -169,6 +249,159 @@ resizeCanvas();
     // Initial draw
     drawEnvironment();
   </script>
+  <script src="physics.js"></script>
+  
+  <script>
+    // Global variables
+    let lastFrameTime = Date.now();
+    
+    // Initialize physics on script load
+    if (typeof initPhysics === 'function') {
+      initPhysics(window.rocketConfig || { thrust: 1.0, fuel: 100, mass: 1000, wind: 0 });
+      console.log('Physics initialized');
+    }
+
+    // Animation loop
+    function animationFrame() {
+      const now = Date.now();
+      const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+      lastFrameTime = now;
+
+      if (typeof rocketPhysics !== 'undefined' && rocketPhysics && rocketPhysics.isLaunched) {
+        const config = window.rocketConfig || { thrust: 1.0 };
+        rocketPhysics.update(dt, config.thrust);
+      }
+
+      drawFrame();
+      requestAnimationFrame(animationFrame);
+    }
+
+    function drawFrame() {
+      resizeCanvas();
+      
+      if (typeof rocketPhysics !== 'undefined' && rocketPhysics && rocketPhysics.isLaunched) {
+        const dpr = window.devicePixelRatio || 1;
+        const scale = 10;
+        const canvasCenterX = canvas.width / (2 * dpr);
+        const canvasGroundY = canvas.height / dpr - 120;
+        
+        const screenX = canvasCenterX + rocketPhysics.x * scale;
+        const screenY = canvasGroundY - rocketPhysics.y * scale;
+        
+        drawRocketMidFlight(ctx, screenX, screenY, rocketPhysics.angle, 1);
+        drawTelemetry(rocketPhysics.getTelemetry());
+      }
+    }
+
+    function drawRocketMidFlight(ctx, cx, cy, angle, scale = 1) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle - Math.PI / 2);
+      
+      const halfW = 22 * scale;
+      const height = 160 * scale;
+      const bodyTop = -height / 2;
+
+      // body
+      ctx.beginPath();
+      ctx.moveTo(-halfW, height / 2);
+      ctx.lineTo(-halfW, bodyTop + 40 * scale);
+      ctx.quadraticCurveTo(-halfW, bodyTop, 0, bodyTop - 24 * scale);
+      ctx.quadraticCurveTo(halfW, bodyTop, halfW, bodyTop + 40 * scale);
+      ctx.lineTo(halfW, height / 2);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(-halfW, bodyTop, halfW, height / 2);
+      g.addColorStop(0, '#f2f4f7');
+      g.addColorStop(0.5, '#ffffff');
+      g.addColorStop(1, '#d6d8dc');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // nose cone
+      ctx.beginPath();
+      ctx.moveTo(0, bodyTop - 24 * scale);
+      ctx.lineTo(-halfW * 0.7, bodyTop + 10 * scale);
+      ctx.lineTo(halfW * 0.7, bodyTop + 10 * scale);
+      ctx.closePath();
+      ctx.fillStyle = '#ff6b4a';
+      ctx.fill();
+      ctx.stroke();
+
+      // window
+      ctx.beginPath();
+      ctx.arc(0, bodyTop + 52 * scale, 10 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = '#0e4160';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // left fin
+      ctx.beginPath();
+      ctx.moveTo(-halfW, height / 2 - 20 * scale);
+      ctx.lineTo(-halfW - 18 * scale, height / 2 + 6 * scale);
+      ctx.lineTo(-halfW / 3, height / 2 - 6 * scale);
+      ctx.closePath();
+      ctx.fillStyle = '#b33f3f';
+      ctx.fill();
+
+      // right fin
+      ctx.beginPath();
+      ctx.moveTo(halfW, height / 2 - 20 * scale);
+      ctx.lineTo(halfW + 18 * scale, height / 2 + 6 * scale);
+      ctx.lineTo(halfW / 3, height / 2 - 6 * scale);
+      ctx.closePath();
+      ctx.fillStyle = '#b33f3f';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawTelemetry(telemetry) {
+      const padding = 12;
+      const lineHeight = 18;
+      const x = 12;
+      let y = 12;
+
+      ctx.font = 'bold 14px monospace';
+      ctx.fillStyle = '#00ff00';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 3;
+
+      const lines = [
+        `ALT: ${telemetry.altitude.toFixed(1)}m`,
+        `VEL: ${telemetry.velocity.toFixed(1)}m/s`,
+        `FUEL: ${telemetry.fuel.toFixed(1)}kg`,
+        `TIME: ${telemetry.time}s`,
+        `ANGLE: ${telemetry.angle}°`,
+        `WIND: ${telemetry.windSpeed.toFixed(1)}m/s`
+      ];
+
+      lines.forEach(line => {
+        ctx.strokeText(line, x, y);
+        ctx.fillText(line, x, y);
+        y += lineHeight;
+      });
+    }
+
+    // Start animation loop when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        lastFrameTime = Date.now();
+        animationFrame();
+        console.log('Animation loop started');
+      });
+    } else {
+      // DOM already loaded
+      lastFrameTime = Date.now();
+      animationFrame();
+      console.log('Animation loop started (DOM already loaded)');
+    }
+  </script>
+  
   <!-- Improved, high-contrast control panel -->
 <style>
   .control-panel {
@@ -190,7 +423,7 @@ resizeCanvas();
   .control-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
   .control-label { flex: 1; color: #d1d4da; margin-right:12px; font-size:13px }
   .control-value { width: 66px; text-align:right; font-weight:700; color:#fff }
-  input[type=range] { -webkit-appearance:none; width:100%; height:12px; background:transparent; margin-bottom:8px }
+  input[type=range] { appearance: none; -webkit-appearance:none; width:100%; height:12px; background:transparent; margin-bottom:8px }
   input[type=range]::-webkit-slider-runnable-track { height:8px; background:linear-gradient(90deg,#3a3a3a,#5a5a5a); border-radius:6px }
   input[type=range]::-moz-range-track { height:8px; background:#4a4a4a; border-radius:6px }
   input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:#ffcc00; border:3px solid rgba(255,255,255,0.12); margin-top:-5px; box-shadow:0 2px 6px rgba(0,0,0,0.5) }
@@ -203,55 +436,79 @@ resizeCanvas();
 </style>
 
 <div class="control-panel" aria-label="Rocket controls">
-  <h2>Rocket Controls</h2>
+  <h2>Rocket Control</h2>
 
   <div class="control-row">
     <div class="control-label">Thrust</div>
     <div class="control-value" id="thrust-val">1.0</div>
   </div>
-  <input id="thrust" type="range" min="0" max="10" step="0.1" value="1.0" aria-valuemin="0" aria-valuemax="10" aria-valuenow="1.0">
+  <input id="thrust" type="range" min="0" max="10" step="0.1" value="1.0">
 
   <div class="control-row">
     <div class="control-label">Fuel</div>
     <div class="control-value" id="fuel-val">100</div>
   </div>
-  <input id="fuel" type="range" min="0" max="500" step="1" value="100" aria-valuemin="0" aria-valuemax="500" aria-valuenow="100">
+  <input id="fuel" type="range" min="0" max="500" step="1" value="100">
 
   <div class="control-row">
     <div class="control-label">Mass</div>
     <div class="control-value" id="mass-val">1000</div>
   </div>
-  <input id="mass" type="range" min="100" max="2000" step="10" value="1000" aria-valuemin="100" aria-valuemax="2000" aria-valuenow="1000">
+  <input id="mass" type="range" min="100" max="2000" step="10" value="1000">
+
+  <div class="control-row">
+    <div class="control-label">Wind</div>
+    <div class="control-value" id="wind-val">0.0</div>
+  </div>
+  <input id="wind" type="range" min="-20" max="20" step="0.5" value="0">
+
+  <button id="launch-btn" style="width:100%; padding:8px; margin-top:8px; background:#ff6b4a; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer; font-size:13px;">LAUNCH</button>
+  <button id="reset-btn" style="width:100%; padding:8px; margin-top:4px; background:#4a8ec2; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer; font-size:13px;">RESET</button>
 </div>
 
 <script>
-  window.rocketConfig = window.rocketConfig || { thrust: 1.0, fuel: 100, mass: 1000 };
+  window.rocketConfig = window.rocketConfig || { thrust: 1.0, fuel: 100, mass: 1000, wind: 0 };
 
   function updateConfig(key, value) {
     window.rocketConfig[key] = value;
     const el = document.getElementById(key + '-val');
-    if (el) el.textContent = (key === 'thrust') ? parseFloat(value).toFixed(1) : String(value);
+    if (el) el.textContent = (key === 'thrust' || key === 'wind') ? parseFloat(value).toFixed(1) : String(value);
     const slider = document.getElementById(key);
     if (slider) slider.setAttribute('aria-valuenow', String(value));
+    
+    // Update physics in real-time
+    if (typeof rocketPhysics !== 'undefined' && rocketPhysics) {
+      if (key === 'wind') rocketPhysics.setWind(value);
+    }
+    
     window.dispatchEvent(new CustomEvent('rocketConfigChanged', { detail: { key, value } }));
   }
 
-  [['thrust','float'], ['fuel','int'], ['mass','int']].forEach(([id, type])=>{
+  [['thrust','float'], ['fuel','int'], ['mass','int'], ['wind','float']].forEach(([id, type])=>{
     const el = document.getElementById(id);
     if (!el) return;
     const parse = type === 'float' ? v => parseFloat(v) : v => parseInt(v,10);
     const onInput = () => updateConfig(id, parse(el.value));
     el.addEventListener('input', onInput);
     el.addEventListener('change', onInput);
-    el.addEventListener('keydown', (e)=>{
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { el.value = Number(el.value) - Number(el.step); onInput(); e.preventDefault(); }
-      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { el.value = Number(el.value) + Number(el.step); onInput(); e.preventDefault(); }
-    });
     onInput();
+  });
+
+  // Launch button
+  document.getElementById('launch-btn').addEventListener('click', () => {
+    if (typeof rocketPhysics !== 'undefined' && rocketPhysics) {
+      rocketPhysics.reset(window.rocketConfig);
+      rocketPhysics.launch();
+    }
+  });
+
+  // Reset button
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    if (typeof rocketPhysics !== 'undefined' && rocketPhysics) {
+      rocketPhysics.reset(window.rocketConfig);
+    }
   });
 </script>
   </style>
-
-
 </body>
 </html>
